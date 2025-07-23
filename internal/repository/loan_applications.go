@@ -19,7 +19,6 @@ func NewLoanApplicationsRepository(repository *Repository) *LoanApplicationsRepo
 }
 func (r *LoanApplicationsRepository) FindAll() ([]*domain.LoanApplication, error) {
 	var loanApplications []*domain.LoanApplication
-	//result := r.Repository.db.Table("loan_applications").Find(&loanApplications)
 	result := r.Repository.db.
 		Table("loan_applications la").
 		Select(`
