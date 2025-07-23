@@ -32,7 +32,7 @@ func (o *Organization) GetAll() ([]*domain.Organization, error) {
 }
 func (o *Organization) Create(organization *models.Organization) (*domain.Organization, error) {
 
-	result := o.Repository.db.Table("organizations").Create(&organization)
+	result := o.Repository.db.Table("organizations").Create(organization)
 	if result.Error != nil {
 		return nil, result.Error
 	}
@@ -48,8 +48,8 @@ func (o *Organization) Create(organization *models.Organization) (*domain.Organi
 
 func (o *Organization) Update(organization *models.Organization) (*domain.Organization, error) {
 
-	var existingOrganization *models.Organization
-	result := o.Repository.db.Table("organizations").Where("uuid = ?", organization.UUID).First(&existingOrganization)
+	existingOrganization := &models.Organization{}
+	result := o.Repository.db.Table("organizations").Where("uuid = ?", organization.UUID).First(existingOrganization)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			return nil, internal.ErrRecordNoFound
@@ -59,7 +59,7 @@ func (o *Organization) Update(organization *models.Organization) (*domain.Organi
 
 	existingOrganization.Name = organization.Name
 
-	result = o.Repository.db.Table("organizations").Save(&existingOrganization)
+	result = o.Repository.db.Table("organizations").Save(existingOrganization)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			return nil, internal.ErrRecordNoFound
@@ -75,8 +75,8 @@ func (o *Organization) Update(organization *models.Organization) (*domain.Organi
 	return newOrganization, nil
 }
 func (o *Organization) Delete(uuid *uuid.UUID) error {
-	var organization *models.Organization
-	result := o.Repository.db.Table("organizations").Where("uuid = ?", uuid).First(&organization)
+	organization := &models.Organization{}
+	result := o.Repository.db.Table("organizations").Where("uuid = ?", uuid).First(organization)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			return internal.ErrRecordNoFound
@@ -84,9 +84,24 @@ func (o *Organization) Delete(uuid *uuid.UUID) error {
 		return result.Error
 	}
 
-	result = o.Repository.db.Table("organizations").Delete(&organization)
+	result = o.Repository.db.Table("organizations").Delete(organization)
 	if result.Error != nil {
 		return result.Error
 	}
 	return nil
+}
+func (o *Organization) FindByName(name string) (*domain.Organization, error) {
+	organization := &models.Organization{}
+	result := o.Repository.db.Table("organizations").Where("name = ?", name).First(organization)
+	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			return nil, internal.ErrRecordNoFound
+		}
+		return nil, result.Error
+	}
+	domainOrganization := &domain.Organization{
+		UUID: organization.UUID,
+		Name: organization.Name,
+	}
+	return domainOrganization, nil
 }

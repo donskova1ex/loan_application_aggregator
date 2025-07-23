@@ -41,8 +41,9 @@ func main() {
 
 	repo := repository.NewRepository(pgDb)
 
-	routerBuilder := router.NewBuilder(repo)
-	routerBuilder.OrganizationRouter()
+	routerBuilder := router.NewBuilder(repo).
+		OrganizationRouter().
+		LoanApplicationsRouter()
 
 	logger.Info("Server initialization has started")
 	if err := routerBuilder.GetEngine().Run(":8080"); err != nil {

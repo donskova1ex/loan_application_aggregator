@@ -22,7 +22,7 @@ func (e *ApiError) Error(status int, message string, err error) {
 	e.Message = message
 
 	if errors.As(err, &pgError) {
-		e.Details = pgError.Detail
+		e.Details = pgError.Message
 	}
 
 	if !errors.As(err, &pgError) {
@@ -44,6 +44,8 @@ func HandleError(status int, message string, err error) *ApiError {
 			return ApiErrorResponse(409, message, pgError)
 		case "23503":
 			return ApiErrorResponse(400, message, pgError)
+		case "23514":
+			return ApiErrorResponse(409, message, pgError)
 		default:
 			return ApiErrorResponse(500, message, pgError)
 		}
