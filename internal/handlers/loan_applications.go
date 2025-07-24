@@ -7,8 +7,9 @@ import (
 	"app_aggregator/internal/repository"
 	"app_aggregator/pkg/validators"
 	"errors"
-	"github.com/gin-gonic/gin"
 	"net/http"
+
+	"github.com/gin-gonic/gin"
 )
 
 type LoanApplicationsHandler struct {

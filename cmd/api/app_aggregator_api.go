@@ -6,9 +6,10 @@ import (
 	"app_aggregator/internal/router"
 	"app_aggregator/migrations"
 	"app_aggregator/pkg/db"
-	"github.com/gin-gonic/gin"
 	"log/slog"
 	"os"
+
+	"github.com/gin-gonic/gin"
 )
 
 func main() {

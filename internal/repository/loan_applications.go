@@ -5,6 +5,8 @@ import (
 	"app_aggregator/internal/domain"
 	"app_aggregator/internal/models"
 	"errors"
+
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -59,7 +61,23 @@ func (r *LoanApplicationsRepository) Create(loanApplication *models.LoanApplicat
 	}
 	return loanApplication, nil
 }
+func (r *LoanApplicationsRepository) Delete(uuid *uuid.UUID) error {
+	loan_application := &models.LoanApplication{}
 
+	result := r.Repository.db.Table("loan_applications").Where("uuid = ?", uuid).First(loan_application)
+	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			return internal.ErrRecordNoFound
+		}
+		return result.Error
+	}
+
+	result = r.Repository.db.Table("loan_applications").Delete(loan_application)
+	if result.Error != nil {
+		return result.Error
+	}
+	return nil
+}
 func (r *LoanApplicationsRepository) FindOrganizationByName(name string) (*domain.Organization, error) {
 	organization := &models.Organization{}
 	result := r.Repository.db.Table("organizations").Where("name = ?", name).First(organization)
