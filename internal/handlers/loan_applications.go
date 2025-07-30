@@ -7,9 +7,8 @@ import (
 	"app_aggregator/internal/repository"
 	"app_aggregator/pkg/validators"
 	"errors"
-	"net/http"
-
 	"github.com/gin-gonic/gin"
+	"net/http"
 )
 
 type LoanApplicationsHandler struct {
@@ -52,6 +51,20 @@ func (h *LoanApplicationsHandler) Create(c *gin.Context) {
 		return
 	}
 
+	normalizedPhone, err := validators.PhoneNormalization(domainLoanApplication.Phone)
+	if err != nil {
+		switch {
+		case errors.Is(err, internal.ErrEmptyPhoneNumber):
+			apiErr := HandleError(http.StatusBadRequest, "phone in loan application is empty", err)
+			c.AbortWithStatusJSON(apiErr.Status, apiErr)
+			return
+		case errors.Is(err, internal.ErrInvalidPhoneNumber):
+			apiErr := HandleError(http.StatusBadRequest, "phone in loan application invalid", err)
+			c.AbortWithStatusJSON(apiErr.Status, apiErr)
+			return
+		}
+	}
+
 	incomingOrganization, err := h.repo.FindOrganizationByName(domainLoanApplication.IncomingOrganizationName)
 	if err != nil {
 		switch errors.Is(err, internal.ErrRecordNoFound) {
@@ -80,13 +93,26 @@ func (h *LoanApplicationsHandler) Create(c *gin.Context) {
 		}
 	}
 
+	testComment := "Redirecting"
+
 	modelLoanApplication := &models.LoanApplication{
 		IncomingOrganizationUuid: incomingOrganization.UUID,
 		IssueOrganizationUuid:    issueOrganization.UUID,
 		Value:                    domainLoanApplication.Value,
-		Phone:                    domainLoanApplication.Phone,
+		Phone:                    normalizedPhone,
+		Comment:                  testComment,
 	}
 
+	//testResult, err := h.repo.FindClientHistory(modelLoanApplication)
+	//if err != nil {
+	//	switch errors.Is(err, internal.ErrRecordNoFound) {
+	//	case true:
+	//		apiErr := HandleError(http.StatusNotFound, "loan application clients history not found", err)
+	//		c.AbortWithStatusJSON(apiErr.Status, apiErr)
+	//		return
+	//	}
+	//}
+	//fmt.Println(testResult)
 	createdLoanApplication, err := h.repo.Create(modelLoanApplication)
 	if err != nil {
 		switch {
@@ -101,10 +127,18 @@ func (h *LoanApplicationsHandler) Create(c *gin.Context) {
 		}
 
 	}
-	domainLoanApplication.CreatedAt = createdLoanApplication.CreatedAt
-	domainLoanApplication.UpdatedAt = createdLoanApplication.UpdatedAt
-	domainLoanApplication.DeletedAt = createdLoanApplication.DeletedAt
-	domainLoanApplication.UUID = createdLoanApplication.UUID
 
-	c.JSON(http.StatusCreated, domainLoanApplication)
+	newLoanApplication := &domain.LoanApplication{
+		UUID:                     createdLoanApplication.UUID,
+		IncomingOrganizationName: incomingOrganization.Name,
+		IssueOrganizationName:    issueOrganization.Name,
+		Value:                    createdLoanApplication.Value,
+		Phone:                    createdLoanApplication.Phone,
+		CreatedAt:                createdLoanApplication.CreatedAt,
+		UpdatedAt:                createdLoanApplication.UpdatedAt,
+		DeletedAt:                createdLoanApplication.DeletedAt,
+		Comment:                  createdLoanApplication.Comment,
+	}
+
+	c.JSON(http.StatusCreated, newLoanApplication)
 }

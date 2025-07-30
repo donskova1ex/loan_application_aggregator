@@ -6,11 +6,17 @@ import (
 )
 
 type Repository struct {
-	db *gorm.DB
+	db        *gorm.DB
+	kassaDb   *gorm.DB
+	doverixDb *gorm.DB
+	deDb      *gorm.DB
 }
 
 func NewRepository(db *db.DB) *Repository {
 	return &Repository{
-		db: db.DB,
+		db:        db.PGDB,
+		kassaDb:   db.KassaDB,
+		doverixDb: db.DoverixDB,
+		deDb:      db.DEDB,
 	}
 }

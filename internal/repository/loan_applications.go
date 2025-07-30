@@ -31,7 +31,8 @@ func (r *LoanApplicationsRepository) FindAll() ([]*domain.LoanApplication, error
             la.phone,
             la.created_at,
             la.updated_at,
-            la.deleted_at
+            la.deleted_at,
+			la.comment
         `).
 		Joins("LEFT JOIN organizations io ON io.uuid = la.incoming_organization_uuid").
 		Joins("LEFT JOIN organizations oo ON oo.uuid = la.issue_organization_uuid").
@@ -95,4 +96,21 @@ func (r *LoanApplicationsRepository) FindOrganizationByName(name string) (*domai
 		Name:      organization.Name,
 	}
 	return domainOrganization, nil
+}
+
+func (r *LoanApplicationsRepository) FindClientHistory(loanApplication *models.LoanApplication) (*map[string]interface{}, error) {
+
+	return nil, nil
+}
+
+func (r *LoanApplicationsRepository) checkKassaHistory(phoneNumber string) *map[string]interface{} {
+	mapData := make(map[string]interface{})
+	//TODO: Добавить запрос из DBeaver
+	resultKassa := r.Repository.kassaDb.Table("Clients").Select("id, MobileNumber").Where("MobileNumber = ?", phoneNumber).Scan(&mapData)
+	if resultKassa.Error != nil {
+		if errors.Is(resultKassa.Error, gorm.ErrRecordNotFound) {
+			return nil
+		}
+	}
+	return &mapData
 }
