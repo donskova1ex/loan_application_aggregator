@@ -106,7 +106,12 @@ func (r *LoanApplicationsRepository) FindClientHistory(loanApplication *models.L
 func (r *LoanApplicationsRepository) checkKassaHistory(phoneNumber string) *map[string]interface{} {
 	mapData := make(map[string]interface{})
 	//TODO: Добавить запрос из DBeaver
-	resultKassa := r.Repository.kassaDb.Table("Clients").Select("id, MobileNumber").Where("MobileNumber = ?", phoneNumber).Scan(&mapData)
+	resultKassa := r.Repository.
+		kassaDb.
+		Table("Clients").
+		Select("id, MobileNumber").
+		Where("MobileNumber = ?", phoneNumber).
+		Scan(&mapData)
 	if resultKassa.Error != nil {
 		if errors.Is(resultKassa.Error, gorm.ErrRecordNotFound) {
 			return nil
