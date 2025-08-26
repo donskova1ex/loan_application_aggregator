@@ -3,9 +3,9 @@ package main
 import (
 	"context"
 	"log/slog"
+	"net/http"
 	"os"
-	"os/signal"
-	"syscall"
+	"sync"
 	"time"
 
 	"app_aggregator/internal/config"
@@ -13,12 +13,15 @@ import (
 	"app_aggregator/internal/router"
 	"app_aggregator/internal/services"
 	"app_aggregator/migrations"
+	"app_aggregator/pkg/closer"
 	"app_aggregator/pkg/db"
 )
 
 func main() {
 	logger := initLogger()
 	logger.Info("Starting application")
+
+	closer := closer.NewGracefulCloser()
 
 	logger.Info("Initializing configuration")
 	cfg, err := config.InitConfig()
@@ -55,26 +58,50 @@ func main() {
 	logger.Info("Initializing HTTP server")
 	httpServer := router.NewHTTPServer(organizationService, loanApplicationService, logger)
 
-	done := make(chan os.Signal, 1)
-	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+	// Флаг для отслеживания состояния сервера
+	serverShutdown := make(chan struct{})
+	var shutdownOnce sync.Once
+
+	closer.Add(func() error {
+		logger.Info("Shutting down HTTP server")
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		// Проверяем, не закрыт ли уже сервер
+		select {
+		case <-serverShutdown:
+			logger.Info("HTTP server already shutdown")
+			return nil
+		default:
+		}
+
+		err := httpServer.Shutdown(ctx)
+		// Безопасно закрываем канал только один раз
+		shutdownOnce.Do(func() {
+			close(serverShutdown)
+		})
+		return err
+	})
+
+	closer.Add(func() error {
+		logger.Info("Closing database connections")
+		return database.Close()
+	})
 
 	go func() {
-		if err := httpServer.Start(); err != nil {
+		if err := httpServer.Start(); err != nil && err != http.ErrServerClosed {
 			logger.Error("HTTP server error", slog.String("error", err.Error()))
 		}
+		// Безопасно закрываем канал только один раз
+		shutdownOnce.Do(func() {
+			close(serverShutdown)
+		})
 	}()
 
 	logger.Info("Application started successfully", slog.String("port", ":8080"))
 
-	<-done
-	logger.Info("Shutdown signal received")
-
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	if err := httpServer.Shutdown(ctx); err != nil {
-		logger.Error("Error during server shutdown", slog.String("error", err.Error()))
-	}
+	ctx := context.Background()
+	closer.Run(ctx, logger)
 
 	logger.Info("Application shutdown completed")
 }

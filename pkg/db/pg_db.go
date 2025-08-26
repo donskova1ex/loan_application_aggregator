@@ -3,6 +3,7 @@ package db
 import (
 	"app_aggregator/internal/config"
 	"fmt"
+
 	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlserver"
 	"gorm.io/gorm"
@@ -39,4 +40,46 @@ func InitDB(cfg *config.Config) (*DB, error) {
 		DoverixDB: doverixDb,
 		DEDB:      deDb,
 	}, nil
+}
+
+func (db *DB) Close() error {
+	var errors []error
+
+	if db.PGDB != nil {
+		if sqlDB, err := db.PGDB.DB(); err == nil {
+			if err := sqlDB.Close(); err != nil {
+				errors = append(errors, fmt.Errorf("failed to close PGDB: %w", err))
+			}
+		}
+	}
+
+	if db.KassaDB != nil {
+		if sqlDB, err := db.KassaDB.DB(); err == nil {
+			if err := sqlDB.Close(); err != nil {
+				errors = append(errors, fmt.Errorf("failed to close KassaDB: %w", err))
+			}
+		}
+	}
+
+	if db.DoverixDB != nil {
+		if sqlDB, err := db.DoverixDB.DB(); err == nil {
+			if err := sqlDB.Close(); err != nil {
+				errors = append(errors, fmt.Errorf("failed to close DoverixDB: %w", err))
+			}
+		}
+	}
+
+	if db.DEDB != nil {
+		if sqlDB, err := db.DEDB.DB(); err == nil {
+			if err := sqlDB.Close(); err != nil {
+				errors = append(errors, fmt.Errorf("failed to close DEDB: %w", err))
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return fmt.Errorf("errors closing databases: %v", errors)
+	}
+
+	return nil
 }
