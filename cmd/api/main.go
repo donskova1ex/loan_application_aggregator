@@ -58,7 +58,6 @@ func main() {
 	logger.Info("Initializing HTTP server")
 	httpServer := router.NewHTTPServer(organizationService, loanApplicationService, logger)
 
-	// Флаг для отслеживания состояния сервера
 	serverShutdown := make(chan struct{})
 	var shutdownOnce sync.Once
 
@@ -67,7 +66,6 @@ func main() {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
-		// Проверяем, не закрыт ли уже сервер
 		select {
 		case <-serverShutdown:
 			logger.Info("HTTP server already shutdown")
@@ -76,7 +74,6 @@ func main() {
 		}
 
 		err := httpServer.Shutdown(ctx)
-		// Безопасно закрываем канал только один раз
 		shutdownOnce.Do(func() {
 			close(serverShutdown)
 		})
@@ -92,7 +89,6 @@ func main() {
 		if err := httpServer.Start(); err != nil && err != http.ErrServerClosed {
 			logger.Error("HTTP server error", slog.String("error", err.Error()))
 		}
-		// Безопасно закрываем канал только один раз
 		shutdownOnce.Do(func() {
 			close(serverShutdown)
 		})
