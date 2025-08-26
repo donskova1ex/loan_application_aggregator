@@ -4,6 +4,7 @@ import (
 	"app_aggregator/internal"
 	"app_aggregator/internal/domain"
 	"app_aggregator/internal/models"
+	"context"
 	"errors"
 
 	"github.com/google/uuid"
@@ -19,24 +20,14 @@ func NewLoanApplicationsRepository(repository *Repository) *LoanApplicationsRepo
 		Repository: repository,
 	}
 }
-func (r *LoanApplicationsRepository) FindAll() ([]*domain.LoanApplication, error) {
-	var loanApplications []*domain.LoanApplication
+
+func (r *LoanApplicationsRepository) GetAll(ctx context.Context) ([]*domain.LoanApplication, error) {
+	var loanApplications []*models.LoanApplication
 	result := r.Repository.db.
-		Table("loan_applications la").
-		Select(`
-            la.uuid,
-            io.name as incoming_organization_name,
-            oo.name as issue_organization_name,
-            la.value,
-            la.phone,
-            la.created_at,
-            la.updated_at,
-            la.deleted_at,
-			la.comment
-        `).
-		Joins("LEFT JOIN organizations io ON io.uuid = la.incoming_organization_uuid").
-		Joins("LEFT JOIN organizations oo ON oo.uuid = la.issue_organization_uuid").
-		Scan(&loanApplications)
+		Table("loan_applications").
+		Preload("IncomingOrganization").
+		Preload("IssueOrganization").
+		Find(&loanApplications)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			return nil, internal.ErrRecordNoFound
@@ -44,11 +35,48 @@ func (r *LoanApplicationsRepository) FindAll() ([]*domain.LoanApplication, error
 		return nil, result.Error
 	}
 
-	return loanApplications, nil
+	domainApplications := make([]*domain.LoanApplication, len(loanApplications))
+	for i, app := range loanApplications {
+		domainApplications[i] = domain.LoanApplicationFromModel(app)
+	}
+
+	return domainApplications, nil
 }
-func (r *LoanApplicationsRepository) Create(loanApplication *models.LoanApplication) (*models.LoanApplication, error) {
+
+func (r *LoanApplicationsRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.LoanApplication, error) {
+	loanApplication := &models.LoanApplication{}
+	result := r.Repository.db.
+		Table("loan_applications").
+		Preload("IncomingOrganization").
+		Preload("IssueOrganization").
+		Where("uuid = ?", id).
+		First(loanApplication)
+	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			return nil, internal.ErrRecordNoFound
+		}
+		return nil, result.Error
+	}
+	return domain.LoanApplicationFromModel(loanApplication), nil
+}
+
+func (r *LoanApplicationsRepository) Create(ctx context.Context, loanApplication *domain.LoanApplication) (*domain.LoanApplication, error) {
+	incomingOrg, err := r.FindOrganizationByName(loanApplication.IncomingOrganizationName)
+	if err != nil {
+		return nil, err
+	}
+
+	issueOrg, err := r.FindOrganizationByName(loanApplication.IssueOrganizationName)
+	if err != nil {
+		return nil, err
+	}
+
+	model := loanApplication.ToModel()
+	model.IncomingOrganizationUuid = incomingOrg.UUID
+	model.IssueOrganizationUuid = issueOrg.UUID
+
 	var count int64
-	err := r.Repository.db.Table("loan_applications").Where("phone = ? AND created_at::date = CURRENT_DATE", loanApplication.Phone).Count(&count).Error
+	err = r.Repository.db.Table("loan_applications").Where("phone = ? AND created_at::date = CURRENT_DATE", model.Phone).Count(&count).Error
 	if err != nil {
 		return nil, err
 	}
@@ -56,16 +84,87 @@ func (r *LoanApplicationsRepository) Create(loanApplication *models.LoanApplicat
 		return nil, internal.ErrPhoneNumberExistToday
 	}
 
-	result := r.Repository.db.Table("loan_applications").Create(loanApplication)
+	result := r.Repository.db.Table("loan_applications").Create(model)
 	if result.Error != nil {
 		return nil, result.Error
 	}
-	return loanApplication, nil
+
+	result = r.Repository.db.
+		Table("loan_applications").
+		Preload("IncomingOrganization").
+		Preload("IssueOrganization").
+		Where("uuid = ?", model.UUID).
+		First(model)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+
+	return domain.LoanApplicationFromModel(model), nil
 }
-func (r *LoanApplicationsRepository) Delete(uuid *uuid.UUID) error {
+
+func (r *LoanApplicationsRepository) Update(ctx context.Context, loanApplication *domain.LoanApplication) (*domain.LoanApplication, error) {
+	model := loanApplication.ToModel()
+
+	existingApplication := &models.LoanApplication{}
+	result := r.Repository.db.
+		Table("loan_applications").
+		Preload("IncomingOrganization").
+		Preload("IssueOrganization").
+		Where("uuid = ?", model.UUID).
+		First(existingApplication)
+	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			return nil, internal.ErrRecordNoFound
+		}
+		return nil, result.Error
+	}
+
+	if loanApplication.IncomingOrganizationName != "" {
+		incomingOrg, err := r.FindOrganizationByName(loanApplication.IncomingOrganizationName)
+		if err != nil {
+			return nil, err
+		}
+		existingApplication.IncomingOrganizationUuid = incomingOrg.UUID
+	}
+	if loanApplication.IssueOrganizationName != "" {
+		issueOrg, err := r.FindOrganizationByName(loanApplication.IssueOrganizationName)
+		if err != nil {
+			return nil, err
+		}
+		existingApplication.IssueOrganizationUuid = issueOrg.UUID
+	}
+	if loanApplication.Value != 0 {
+		existingApplication.Value = loanApplication.Value
+	}
+	if loanApplication.Phone != "" {
+		existingApplication.Phone = loanApplication.Phone
+	}
+	if loanApplication.Comment != "" {
+		existingApplication.Comment = loanApplication.Comment
+	}
+
+	result = r.Repository.db.Table("loan_applications").Save(existingApplication)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+
+	result = r.Repository.db.
+		Table("loan_applications").
+		Preload("IncomingOrganization").
+		Preload("IssueOrganization").
+		Where("uuid = ?", existingApplication.UUID).
+		First(existingApplication)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+
+	return domain.LoanApplicationFromModel(existingApplication), nil
+}
+
+func (r *LoanApplicationsRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	loan_application := &models.LoanApplication{}
 
-	result := r.Repository.db.Table("loan_applications").Where("uuid = ?", uuid).First(loan_application)
+	result := r.Repository.db.Table("loan_applications").Where("uuid = ?", id).First(loan_application)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			return internal.ErrRecordNoFound
@@ -79,6 +178,7 @@ func (r *LoanApplicationsRepository) Delete(uuid *uuid.UUID) error {
 	}
 	return nil
 }
+
 func (r *LoanApplicationsRepository) FindOrganizationByName(name string) (*domain.Organization, error) {
 	organization := &models.Organization{}
 	result := r.Repository.db.Table("organizations").Where("name = ?", name).First(organization)
@@ -88,24 +188,15 @@ func (r *LoanApplicationsRepository) FindOrganizationByName(name string) (*domai
 		}
 		return nil, result.Error
 	}
-	domainOrganization := &domain.Organization{
-		CreatedAt: organization.CreatedAt,
-		UpdatedAt: organization.UpdatedAt,
-		DeletedAt: organization.DeletedAt,
-		UUID:      organization.UUID,
-		Name:      organization.Name,
-	}
-	return domainOrganization, nil
+	return domain.FromModel(organization), nil
 }
 
-func (r *LoanApplicationsRepository) FindClientHistory(loanApplication *models.LoanApplication) (*map[string]interface{}, error) {
-
+func (r *LoanApplicationsRepository) FindClientHistory(loanApplication *domain.LoanApplication) (*map[string]interface{}, error) {
 	return nil, nil
 }
 
 func (r *LoanApplicationsRepository) checkKassaHistory(phoneNumber string) *map[string]interface{} {
 	mapData := make(map[string]interface{})
-	//TODO: Добавить запрос из DBeaver
 	resultKassa := r.Repository.
 		kassaDb.
 		Table("Clients").
@@ -118,4 +209,8 @@ func (r *LoanApplicationsRepository) checkKassaHistory(phoneNumber string) *map[
 		}
 	}
 	return &mapData
+}
+
+func (r *LoanApplicationsRepository) checkDoverixHistory(phoneNumber string) *map[string]interface{} {
+	return nil
 }

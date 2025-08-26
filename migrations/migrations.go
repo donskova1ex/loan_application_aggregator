@@ -4,6 +4,7 @@ import (
 	"app_aggregator/internal/config"
 	"app_aggregator/internal/models"
 	"fmt"
+
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )

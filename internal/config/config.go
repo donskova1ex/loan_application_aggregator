@@ -1,9 +1,11 @@
 package config
 
 import (
+	"errors"
 	"fmt"
-	"github.com/joho/godotenv"
 	"os"
+
+	"github.com/joho/godotenv"
 )
 
 type PGConfig struct {
@@ -21,11 +23,16 @@ type Config struct {
 	SQL  SQLConfig
 }
 
-func InitConfig() (*Config, error) {
-	err := godotenv.Load(".env.local")
-	if err != nil {
-		return nil, fmt.Errorf("error loading .env file")
+func buildMSSQLDSN(server, user, password, database string) string {
+	if server == "" || user == "" || password == "" || database == "" {
+		return ""
 	}
+	return fmt.Sprintf("server=%s;user id=%s;password=%s;database=%s;encrypt=disable;", server, user, password, database)
+}
+
+func InitConfig() (*Config, error) {
+
+	_ = godotenv.Load(".env.local", ".env")
 
 	sqlServer := os.Getenv("SQL_SERVER")
 	sqlUser := os.Getenv("SQL_USER")
@@ -34,12 +41,17 @@ func InitConfig() (*Config, error) {
 	sqlDoverixDb := os.Getenv("SQL_DB_DOVERIX")
 	sqlDeDb := os.Getenv("SQL_DB_DE")
 
-	kassaDSN := fmt.Sprintf("server=%s;user id=%s;password=%s;database=%s;", sqlServer, sqlUser, sqlPassword, sqlKassaDb)
-	doverixDSN := fmt.Sprintf("server=%s;user id=%s;password=%s;database=%s;", sqlServer, sqlUser, sqlPassword, sqlDoverixDb)
-	deDSN := fmt.Sprintf("server=%s;user id=%s;password=%s;database=%s;", sqlServer, sqlUser, sqlPassword, sqlDeDb)
+	kassaDSN := buildMSSQLDSN(sqlServer, sqlUser, sqlPassword, sqlKassaDb)
+	doverixDSN := buildMSSQLDSN(sqlServer, sqlUser, sqlPassword, sqlDoverixDb)
+	deDSN := buildMSSQLDSN(sqlServer, sqlUser, sqlPassword, sqlDeDb)
+
+	pgDSN := os.Getenv("POSTGRES_DSN")
+	if pgDSN == "" {
+		return nil, errors.New("POSTGRES_DSN is required but not set")
+	}
 	config := &Config{
 		PGdb: PGConfig{
-			DSN: os.Getenv("POSTGRES_DSN"),
+			DSN: pgDSN,
 		},
 		SQL: SQLConfig{
 			DsnKassa:   kassaDSN,
