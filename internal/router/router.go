@@ -10,6 +10,7 @@ import (
 	"app_aggregator/internal/domain"
 	"app_aggregator/internal/handlers"
 	"app_aggregator/internal/middleware"
+	"app_aggregator/internal/ratelimit"
 )
 
 type HTTPServer struct {
@@ -29,9 +30,17 @@ func NewHTTPServer(
 
 	registerRoutes(mux, organizationHandler, loanApplicationHandler)
 
+	rateLimitConfig := &ratelimit.Config{
+		RequestsPerMinute: 100,
+		WindowSize:        1 * time.Minute,
+		CleanupInterval:   1 * time.Minute,
+		BlockDuration:     1 * time.Minute,
+	}
+
 	handler := middleware.Chain(
 		mux,
 		middleware.Logger(logger),
+		middleware.RateLimitWithLogger(rateLimitConfig, logger),
 		middleware.CORS(),
 		middleware.Recovery(logger),
 	)

@@ -34,14 +34,14 @@ func Logger(logger *slog.Logger) func(http.Handler) http.Handler {
 
 			next.ServeHTTP(wrapped, r)
 
-			duration := time.Since(start)
+			duration := time.Since(start).Milliseconds()
 			logger.Info("HTTP request",
 				slog.String("method", r.Method),
 				slog.String("path", r.URL.Path),
 				slog.String("remote_addr", r.RemoteAddr),
 				slog.String("user_agent", r.UserAgent()),
 				slog.Int("status_code", wrapped.statusCode),
-				slog.Duration("duration", duration),
+				slog.Int64("duration_ms", duration),
 			)
 		})
 	}
