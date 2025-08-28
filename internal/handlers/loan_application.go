@@ -73,14 +73,12 @@ func (h *HTTPLoanApplicationHandler) Create(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Валидация телефона
 	if !validators.ValidPhone(req.Phone) {
 		h.logger.Error("invalid phone number", slog.String("phone", req.Phone))
 		h.writeError(w, http.StatusBadRequest, "Invalid phone number format")
 		return
 	}
 
-	// Нормализация телефона
 	normalizedPhone, err := validators.PhoneNormalization(req.Phone)
 	if err != nil {
 		h.logger.Error("failed to normalize phone number", slog.String("phone", req.Phone), slog.String("error", err.Error()))

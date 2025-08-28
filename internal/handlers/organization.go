@@ -88,7 +88,6 @@ func (h *HTTPOrganizationHandler) Create(w http.ResponseWriter, r *http.Request)
 	h.writeJSON(w, http.StatusCreated, createdOrg)
 }
 
-// Update обновляет существующую организацию
 func (h *HTTPOrganizationHandler) Update(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
