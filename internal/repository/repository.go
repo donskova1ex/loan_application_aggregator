@@ -2,6 +2,7 @@ package repository
 
 import (
 	"app_aggregator/pkg/db"
+
 	"gorm.io/gorm"
 )
 

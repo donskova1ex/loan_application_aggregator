@@ -23,7 +23,7 @@ func NewOrganizationRepository(r *Repository) *Organization {
 
 func (o *Organization) GetAll(ctx context.Context) ([]*domain.Organization, error) {
 	var organizations []*models.Organization
-	result := o.Repository.db.Table("organizations").Find(&organizations)
+	result := o.Repository.db.WithContext(ctx).Table("organizations").Find(&organizations)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			return nil, internal.ErrRecordNoFound
@@ -41,7 +41,7 @@ func (o *Organization) GetAll(ctx context.Context) ([]*domain.Organization, erro
 
 func (o *Organization) GetByID(ctx context.Context, id uuid.UUID) (*domain.Organization, error) {
 	organization := &models.Organization{}
-	result := o.Repository.db.Table("organizations").Where("uuid = ?", id).First(organization)
+	result := o.Repository.db.WithContext(ctx).Table("organizations").Where("uuid = ?", id).First(organization)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			return nil, internal.ErrRecordNoFound
@@ -54,7 +54,7 @@ func (o *Organization) GetByID(ctx context.Context, id uuid.UUID) (*domain.Organ
 func (o *Organization) Create(ctx context.Context, organization *domain.Organization) (*domain.Organization, error) {
 	model := organization.ToModel()
 
-	result := o.Repository.db.Table("organizations").Create(model)
+	result := o.Repository.db.WithContext(ctx).Table("organizations").Create(model)
 	if result.Error != nil {
 		return nil, result.Error
 	}
@@ -66,7 +66,7 @@ func (o *Organization) Update(ctx context.Context, organization *domain.Organiza
 	model := organization.ToModel()
 
 	existingOrganization := &models.Organization{}
-	result := o.Repository.db.Table("organizations").Where("uuid = ?", model.UUID).First(existingOrganization)
+	result := o.Repository.db.WithContext(ctx).Table("organizations").Where("uuid = ?", model.UUID).First(existingOrganization)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			return nil, internal.ErrRecordNoFound
@@ -76,7 +76,7 @@ func (o *Organization) Update(ctx context.Context, organization *domain.Organiza
 
 	existingOrganization.Name = model.Name
 
-	result = o.Repository.db.Table("organizations").Save(existingOrganization)
+	result = o.Repository.db.WithContext(ctx).Table("organizations").Save(existingOrganization)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			return nil, internal.ErrRecordNoFound
@@ -88,7 +88,7 @@ func (o *Organization) Update(ctx context.Context, organization *domain.Organiza
 
 func (o *Organization) Delete(ctx context.Context, id uuid.UUID) error {
 	organization := &models.Organization{}
-	result := o.Repository.db.Table("organizations").Where("uuid = ?", id).First(organization)
+	result := o.Repository.db.WithContext(ctx).Table("organizations").Where("uuid = ?", id).First(organization)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			return internal.ErrRecordNoFound
@@ -96,16 +96,16 @@ func (o *Organization) Delete(ctx context.Context, id uuid.UUID) error {
 		return result.Error
 	}
 
-	result = o.Repository.db.Table("organizations").Delete(organization)
+	result = o.Repository.db.WithContext(ctx).Table("organizations").Delete(organization)
 	if result.Error != nil {
 		return result.Error
 	}
 	return nil
 }
 
-func (o *Organization) FindByName(name string) (*domain.Organization, error) {
+func (o *Organization) FindByName(ctx context.Context, name string) (*domain.Organization, error) {
 	organization := &models.Organization{}
-	result := o.Repository.db.Table("organizations").Where("name = ?", name).First(organization)
+	result := o.Repository.db.WithContext(ctx).Table("organizations").Where("name = ?", name).First(organization)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			return nil, internal.ErrRecordNoFound
